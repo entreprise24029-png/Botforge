@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="stats-grid">
+    <div class="stat-card">
+        <span class="stat-number">{{ stats.total_clients }}</span>
+        <span class="stat-label">عملاء</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-number">{{ stats.total_bots }}</span>
+        <span class="stat-label">بوتات</span>
+    </div>
+    <div class="stat-card active">
+        <span class="stat-number">{{ stats.active_bots }}</span>
+        <span class="stat-label">نشطة</span>
+    </div>
+    <div class="stat-card expired">
+        <span class="stat-number">{{ stats.expired_bots }}</span>
+        <span class="stat-label">منتهية</span>
+    </div>
+    <div class="stat-card channels">
+        <span class="stat-number">{{ stats.channels }}</span>
+        <span class="stat-label">قنوات / مجموعات</span>
+    </div>
+    <div class="stat-card groups">
+        <span class="stat-number">{{ stats.support_groups }}</span>
+        <span class="stat-label">مجموعات دعم</span>
+    </div>
+    <div class="stat-card published">
+        <span class="stat-number">{{ stats.published }}</span>
+        <span class="stat-label">عمليات نشر ناجحة</span>
+    </div>
+    <div class="stat-card failed">
+        <span class="stat-number">{{ stats.failed_publications }}</span>
+        <span class="stat-label">عمليات فاشلة</span>
+    </div>
+</section>
+
+<section class="table-section">
+    <h2>بوتات الدعم</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>البوت</th>
+                <th>الشركة</th>
+                <th>المالك</th>
+                <th>الحالة</th>
+                <th>اللغة</th>
+                <th>القنوات</th>
+                <th>النشر</th>
+                <th>ينتهي في</th>
+                <th>إجراء</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bot in bots %}
+            <tr>
+                <td>{{ bot.id }}</td>
+                <td>@{{ bot.username }}</td>
+                <td>{{ bot.company_name }}</td>
+                <td>{{ bot.owner_name }}</td>
+                <td>
+                    {% if bot.is_active %}
+                        <span class="badge green">نشط</span>
+                    {% else %}
+                        <span class="badge red">غير مفعّل</span>
+                    {% endif %}
+                </td>
+                <td>{{ bot.language }}</td>
+                <td>{{ bot.channel_count }}</td>
+                <td>
+                    <span class="badge green">{{ bot.published }} ناجح</span>
+                    <span class="badge red">{{ bot.failed_publications }} فاشل</span>
+                </td>
+                <td>{{ bot.expires_at.strftime("%Y-%m-%d") if bot.expires_at else "—" }}</td>
+                <td>
+                    <form method="post" action="/bots/{{ bot.id }}/activate">
+                        <input type="number" name="days" value="30" min="1" class="days-input">
+                        <button type="submit">تفعيل يدوي</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}

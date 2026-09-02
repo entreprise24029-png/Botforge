@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="login-box">
+    <h2>تسجيل دخول الأدمن</h2>
+    <form method="post" action="/login">
+        <label for="username">اسم المستخدم</label>
+        <input id="username" name="username" type="text" autocomplete="username" required>
+
+        <label for="password">كلمة المرور</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <button type="submit">دخول</button>
+    </form>
+</section>
+
+{% endblock %}

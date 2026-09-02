@@ -1,0 +1,85 @@
+* { box-sizing: border-box; }
+body {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+}
+.topbar {
+    background: #1e293b;
+    padding: 16px 24px;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.topbar h1 { margin: 0; font-size: 20px; }
+.container { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.stat-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+}
+.stat-card.active { border-color: #22c55e; }
+.stat-card.expired { border-color: #ef4444; }
+.stat-card.channels { border-color: #a855f7; }
+.stat-card.groups { border-color: #eab308; }
+.stat-card.published { border-color: #06b6d4; }
+.stat-card.failed { border-color: #f97316; }
+.stat-number { display: block; font-size: 28px; font-weight: bold; }
+.stat-label { color: #94a3b8; font-size: 13px; }
+
+.table-section { background: #1e293b; border-radius: 10px; padding: 16px; border: 1px solid #334155; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px; text-align: right; border-bottom: 1px solid #334155; font-size: 14px; }
+th { color: #94a3b8; font-weight: 600; }
+
+.badge { padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+.badge.green { background: #14532d; color: #4ade80; }
+.badge.red { background: #450a0a; color: #f87171; }
+td .badge { display: inline-block; margin: 2px; }
+
+.days-input { width: 55px; padding: 4px; margin-inline-end: 6px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; }
+button {
+    background: #2563eb; color: white; border: none; padding: 6px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+button:hover { background: #1d4ed8; }
+
+.result-box { background: #1e293b; padding: 32px; border-radius: 10px; text-align: center; border: 1px solid #334155; }
+
+.login-box {
+    max-width: 420px;
+    margin: 64px auto;
+    background: #1e293b;
+    padding: 24px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+}
+.login-box h2 { margin-top: 0; }
+.login-box label { display: block; margin: 14px 0 6px; color: #94a3b8; }
+.login-box input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+.login-box button { margin-top: 18px; }
+
+@media (max-width: 800px) {
+    .table-section { overflow-x: auto; }
+    table { min-width: 760px; }
+    .topbar { gap: 12px; align-items: flex-start; }
+    .topbar h1 { font-size: 17px; }
+}
