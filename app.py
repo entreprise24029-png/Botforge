@@ -1,56 +1,3 @@
-"""
-# ==========================================
-# 1. استدعاء دالة الفحص في بداية الملف
-# ==========================================
-from services.subscription import add_channel_request
-from models import User, Channel  # استدعاء نماذج قاعدة البيانات الخاصة بكِ
-
-
-# ==========================================
-# 2. دالة إضافة القناة المحدثة بالكامل
-# ==========================================
-@bot.message_handler(commands=['add_channel'])
-def handle_add_channel(message):
-    telegram_id = str(message.from_user.id)
-    
-    # أ) جلب بيانات المستخدم أو إنشاؤه إذا لم يكن موجوداً
-    user = db.query(User).filter(User.telegram_id == telegram_id).first()
-    if not user:
-        user = User(telegram_id=telegram_id)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    # ب) حساب عدد القنوات الحالية التابعة لهذا المستخدم في قاعدة البيانات
-    current_channels_count = db.query(Channel).filter(Channel.user_id == user.id).count()
-
-    # ج) تنفيذ الفحص البرمجي لشروط التجربة المجانية والاشتراك
-    can_add, response_msg = add_channel_request(
-        user=user, 
-        current_channels_count=current_channels_count, 
-        telegram_user_obj=message.from_user
-    )
-
-    # د) إذا رفض النظام إضافة القناة (بسبب تجاوز الحد أو انتهاء التجربة)
-    if not can_add:
-        bot.reply_to(message, response_msg, parse_mode="Markdown")
-        return
-
-    # هـ) في حال نجاح الفحص، يستكمل البوت خطوة طلب رابط/معرف القناة كالمعتاد
-    msg = bot.reply_to(
-        message, 
-        "✅ **يمكنك إضافة قناة جديدة.**\n\nيرجى إرسال معرف القناة (مثال: `@my_channel`) أو أعد توجيه رسالة منها إلى هنا:"
-    )
-    bot.register_next_step_handler(msg, process_channel_addition, user_id=user.id)
-لوحة تحكم ويب بسيطة لصاحب النظام (الأدمن) لمتابعة العملاء والبوتات والاشتراكات،
-بالإضافة إلى استقبال ويبهوك Stripe لتفعيل الاشتراكات تلقائيًا.
-
-التشغيل الموحد:
-    uvicorn app:app --host 0.0.0.0 --port $PORT
-
-تبدأ هذه العملية البوت الرئيسي والبوتات الفرعية النشطة، وتستقبل لوحة التحكم
-وWebhooks كلها عبر FastAPI وعلى نفس المنفذ.
-"""
 import os
 from datetime import datetime
 
@@ -62,6 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
 import stripe as stripe_lib
 import bcrypt
+from sqlalchemy import select
 
 from database.db import (
     async_session,
@@ -70,13 +18,9 @@ from database.db import (
     get_bot_by_stripe_subscription,
     set_stripe_subscription_id,
 )
-from database.models import Client, SupportBot, BotChannel, PublishOperation
+from database.models import Client, SupportBot, BotChannel, PublishOperation, User, Channel
 from core.payments import verify_webhook
-from core.payments_redotpay import (
-    is_subscription_amount,
-    verify_webhook as verify_redotpay_webhook,
-)
-from sqlalchemy import select
+from services.subscription import add_channel_request
 
 load_dotenv()
 from core.bot_manager import manager
@@ -94,15 +38,16 @@ DASHBOARD_COOKIE_SECURE = os.getenv("DASHBOARD_COOKIE_SECURE", "false").lower() 
     "true",
     "yes",
 }
+
 if not DASHBOARD_PASSWORD_HASH:
     raise RuntimeError(
         "DASHBOARD_PASSWORD_HASH غير موجود. "
-        "ولّد قيمة bcrypt واحفظها في Replit Secrets."
+        "ولّد قيمة bcrypt واحفظها في Replit Secrets أو ملف .env."
     )
 if not DASHBOARD_SESSION_SECRET:
     raise RuntimeError(
         "DASHBOARD_SESSION_SECRET غير موجود. "
-        "استخدم سرًا عشوائيًا طويلًا في Replit Secrets."
+        "استخدم سرًا عشوائيًا طويلًا في Replit Secrets أو ملف .env."
     )
 
 app.add_middleware(
@@ -152,6 +97,39 @@ async def login(
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
+
+
+# ---------- معالجة أوامر تليجرام البوت المباشرة ----------
+def handle_add_channel(bot, db, message, process_channel_addition_func):
+    """
+    دالة معالجة أمر إضافة القنوات المحدثة والمربوطة بالـ Freemium + BaridiMob/CCP
+    """
+    telegram_id = str(message.from_user.id)
+    
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        user = User(telegram_id=telegram_id)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    current_channels_count = db.query(Channel).filter(Channel.user_id == user.id).count()
+
+    can_add, response_msg = add_channel_request(
+        user=user, 
+        current_channels_count=current_channels_count, 
+        telegram_user_obj=message.from_user
+    )
+
+    if not can_add:
+        bot.reply_to(message, response_msg, parse_mode="Markdown")
+        return
+
+    msg = bot.reply_to(
+        message, 
+        "✅ **يمكنك إضافة قناة جديدة.**\n\nيرجى إرسال معرف القناة (مثال: `@my_channel`) أو أعد توجيه رسالة منها إلى هنا:"
+    )
+    bot.register_next_step_handler(msg, process_channel_addition_func, user_id=user.id)
 
 
 @app.post("/telegram/webhook/{bot_id}")
@@ -256,7 +234,6 @@ async def dashboard_home(request: Request, admin: str = Depends(check_admin)):
         ]),
     }
 
-    # ربط كل بوت باسم صاحبه لعرضه بسهولة في الجدول
     clients_by_id = {c.id: c for c in clients}
     bots_view = []
     for b in bots:
@@ -316,11 +293,6 @@ async def payment_cancel(request: Request, bot_id: int):
 # ---------- ويبهوك Stripe ----------
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
-    """
-    Stripe يستدعي هذا الرابط تلقائيًا عند نجاح الدفع.
-    يجب ضبط هذا الرابط في لوحة Stripe: https://dashboard.stripe.com/webhooks
-    كـ: https://YOUR_DOMAIN/stripe/webhook
-    """
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
@@ -339,8 +311,6 @@ async def stripe_webhook(request: Request):
             if subscription_id:
                 await set_stripe_subscription_id(int(bot_id), subscription_id)
             await activate_subscription(int(bot_id), days=30)
-            # ملاحظة: تشغيل البوت الفعلي يحدث تلقائيًا خلال دقيقة عبر
-            # sync_newly_activated_bots() في عملية main.py
 
     elif event["type"] == "invoice.paid":
         invoice = event["data"]["object"]
@@ -356,50 +326,5 @@ async def stripe_webhook(request: Request):
         bot_id = await _find_subscription_bot_id(subscription)
         if bot_id:
             await deactivate_bot(bot_id)
-
-    return {"status": "ok"}
-
-
-# ---------- ويبهوك RedotPay ----------
-@app.post("/redotpay/webhook")
-async def redotpay_webhook(request: Request):
-    """
-    RedotPay يستدعي هذا الرابط عند إتمام الدفع (أو تغيّر حالته).
-    يجب ضبطه في لوحة RedotPay كـ: https://YOUR_DOMAIN/redotpay/webhook
-
-    التحقق هنا يعتمد على توقيع RSA (SHA256withRSA) وليس سرًا بسيطًا كما في Stripe —
-    راجع core/payments_redotpay.py و core/redotpay_signature.py للتفاصيل الكاملة.
-    """
-    raw_body = await request.body()
-    headers = {k.lower(): v for k, v in request.headers.items()}
-
-    payload = verify_redotpay_webhook(headers, raw_body)
-    if payload is None:
-        raise HTTPException(status_code=400, detail="توقيع الويبهوك غير صالح أو غير معروف")
-
-    # هيكل الحقول الدقيق (status, outerOrderSn...) يعتمد على نسخة API لديك —
-    # تحقق من التوثيق الرسمي عند أول اختبار فعلي وعدّل القراءة أدناه إن لزم.
-    status = payload.get("status") or payload.get("orderStatus")
-    outer_order_sn = payload.get("outerOrderSn", "")
-
-    if status in ("SUCCESS", "PAID", "success"):
-        data = payload.get("data")
-        nested_amount = data.get("orderAmount") if isinstance(data, dict) else None
-        order_amount = payload.get("orderAmount")
-        if order_amount is None:
-            order_amount = nested_amount
-
-        if not is_subscription_amount(order_amount):
-            raise HTTPException(
-                status_code=400,
-                detail="مبلغ الدفع لا يطابق سعر الاشتراك",
-            )
-
-        # outerOrderSn له الصيغة: bot{bot_id}-xxxxxxxxxx (انظر create_payment_order)
-        try:
-            bot_id = int(outer_order_sn.split("-")[0].replace("bot", ""))
-            await activate_subscription(bot_id, days=30)
-        except (ValueError, IndexError):
-            raise HTTPException(status_code=400, detail="تعذّر استخراج bot_id من outerOrderSn")
 
     return {"status": "ok"}
