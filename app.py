@@ -1,4 +1,47 @@
 """
+# ==========================================
+# 1. استدعاء دالة الفحص في بداية الملف
+# ==========================================
+from services.subscription import add_channel_request
+from models import User, Channel  # استدعاء نماذج قاعدة البيانات الخاصة بكِ
+
+
+# ==========================================
+# 2. دالة إضافة القناة المحدثة بالكامل
+# ==========================================
+@bot.message_handler(commands=['add_channel'])
+def handle_add_channel(message):
+    telegram_id = str(message.from_user.id)
+    
+    # أ) جلب بيانات المستخدم أو إنشاؤه إذا لم يكن موجوداً
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        user = User(telegram_id=telegram_id)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # ب) حساب عدد القنوات الحالية التابعة لهذا المستخدم في قاعدة البيانات
+    current_channels_count = db.query(Channel).filter(Channel.user_id == user.id).count()
+
+    # ج) تنفيذ الفحص البرمجي لشروط التجربة المجانية والاشتراك
+    can_add, response_msg = add_channel_request(
+        user=user, 
+        current_channels_count=current_channels_count, 
+        telegram_user_obj=message.from_user
+    )
+
+    # د) إذا رفض النظام إضافة القناة (بسبب تجاوز الحد أو انتهاء التجربة)
+    if not can_add:
+        bot.reply_to(message, response_msg, parse_mode="Markdown")
+        return
+
+    # هـ) في حال نجاح الفحص، يستكمل البوت خطوة طلب رابط/معرف القناة كالمعتاد
+    msg = bot.reply_to(
+        message, 
+        "✅ **يمكنك إضافة قناة جديدة.**\n\nيرجى إرسال معرف القناة (مثال: `@my_channel`) أو أعد توجيه رسالة منها إلى هنا:"
+    )
+    bot.register_next_step_handler(msg, process_channel_addition, user_id=user.id)
 لوحة تحكم ويب بسيطة لصاحب النظام (الأدمن) لمتابعة العملاء والبوتات والاشتراكات،
 بالإضافة إلى استقبال ويبهوك Stripe لتفعيل الاشتراكات تلقائيًا.
 
