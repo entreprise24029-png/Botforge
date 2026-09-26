@@ -1,5 +1,4 @@
 import os
-import requests
 from datetime import datetime, timezone
 
 FREE_TRIAL_MAX_CHANNELS = 3
@@ -14,7 +13,7 @@ def check_user_access(user):
     if sub_end and sub_end.tzinfo is None:
         sub_end = sub_end.replace(tzinfo=timezone.utc)
 
-    # 1. اشتراك مدفوع وساري المفعول
+    # 1. اشتراك مدفوع وساري المفعول (حد أقصى 199 قناة)
     if getattr(user, 'is_paid', False) and sub_end and sub_end > now:
         return {
             "allowed": True, 
@@ -22,7 +21,7 @@ def check_user_access(user):
             "max_channels": getattr(user, 'paid_channel_limit', 199) or 199
         }
 
-    # 2. التجربة المجانية (أول مرة)
+    # 2. التجربة المجانية (أول 3 قنوات)
     if getattr(user, 'trials_used', 0) == 0:
         return {
             "allowed": True, 
@@ -30,7 +29,7 @@ def check_user_access(user):
             "max_channels": FREE_TRIAL_MAX_CHANNELS
         }
 
-    # 3. انتهاء التجربة أو الاشتراك
+    # 3. انتهاء التجربة أو الاشتراك المسبق
     rip = os.getenv("BARIDIMOB_CCP_RIP", "00799999002581351014")
     ccp = os.getenv("CCP_NUMBER", "0025813510 Clè 14")
     account_name = os.getenv("BARIDIMOB_ACCOUNT_NAME", "بوراس إكرام")
@@ -41,11 +40,11 @@ def check_user_access(user):
         "message": (
             "⚠️ **انتهت الفترة التجريبية المجانية!**\n\n"
             f"لقد استهلكت تجربتك المتاحة ({FREE_TRIAL_MAX_CHANNELS} قنوات).\n"
-            "للاستمرار في إضافة القنوات وتجديد الخدمات، يرجى الاشتراك الشهري عبر:\n\n"
+            "للاستمرار في إضافة القنوات وتجديد الخدمات، يرجى تفعيل الاشتراك الشهري بـ **2500 دج (250 ألف)** عبر:\n\n"
             f"📱 **BaridiMob (RIP):** `{rip}`\n"
             f"📮 **CCP:** `{ccp}`\n"
             f"👤 **الاسم:** {account_name}\n\n"
-            "📌 **بعد التحويل:** يرجى إرسال صورة الوصل أو رقم المعاملة هنا لتفعيل حسابك."
+            "📌 **بعد التحويل:** يرجى إرسال صورة الوصل أو رقم المعاملة هنا لتفعيل حسابك تلقائياً."
         )
     }
 
@@ -63,6 +62,6 @@ def add_channel_request(user, current_channels_count, telegram_user_obj=None):
             user.trials_used = 1  # تسجيل استهلاك التجربة
             return False, access["message"]
         else:
-            return False, "❌ تجاوزت الحد الأقصى للقنوات المسموح بها في اشتراكك الحالي."
+            return False, "❌ تجاوزت الحد الأقصى للقنوات المسموح بها في اشتراكك الحالي (199 قناة)."
 
     return True, "Success"
